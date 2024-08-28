@@ -4,7 +4,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::group(['prefix' => 'gkkr-api'], function(){
     Route::group(['prefix' => 'repository'], function(){
-        $controller = \FuturewebCMS2024\Gkkr\Controllers\Api\Api\RepositoryController::class;
+        $controller = \FuturewebCMS2024\Gkkr\Controllers\Api\RepositoryController::class;
 
         Route::get('list', [$controller, 'repositoryList']);
         Route::get('show/{id}', [$controller, 'repositoryShow']);
@@ -16,7 +16,7 @@ Route::group(['prefix' => 'gkkr-api'], function(){
     });
 
     Route::group(['prefix' => 'component'], function(){
-        $controller = \FuturewebCMS2024\Gkkr\Controllers\Api\Api\ComponentController::class;
+        $controller = \FuturewebCMS2024\Gkkr\Controllers\Api\ComponentController::class;
 
         Route::get('list', [$controller, 'componentList']);
         Route::get('show/{id}', [$controller, 'componentShow']);
