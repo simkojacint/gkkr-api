@@ -1,12 +1,12 @@
 {
-  "name": "simkojacint/gkkr-api",
+  "name": "futurewebcms2024/gkkr-api",
   "description": "GKKR API for FuturewebCMS 2024",
   "keywords": [
     "futurewebcms2024 futureweb gkkr"
   ],
   "license": "proprietary",
   "type": "library",
-  "version": "1.1",
+  "version": "1.0",
   "authors": [
     {
       "name": "Jácint Simkó",
