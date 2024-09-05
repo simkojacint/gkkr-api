@@ -17,7 +17,7 @@ class ComponentController extends BasicApiController
         return $this->defaultInstall($apiName, $dataName, $configName, $id, $version);
     }
 
-    public function componentUninstall(Request $request, $id)
+    public function componentUninstall(Request $request, $id, $version = null)
     {
         return $this->defaultUninstall('component', $id, $version);
     }
@@ -25,6 +25,13 @@ class ComponentController extends BasicApiController
     public function componentList(Request $request)
     {
         $response = $this->webApi->get($this->getUrl('component/list'));
+
+        return $response->json();
+    }
+
+    public function componentDependencyList(Request $request, $id)
+    {
+        $response = $this->webApi->get($this->getUrl('component/dependency-list/' . $id));
 
         return $response->json();
     }

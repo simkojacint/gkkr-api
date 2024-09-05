@@ -19,6 +19,7 @@ Route::group(['prefix' => 'gkkr-api'], function(){
         $controller = \FuturewebCMS2024\Gkkr\Controllers\Api\ComponentController::class;
 
         Route::get('list', [$controller, 'componentList']);
+        Route::get('dependency-list/{id}', [$controller, 'componentDependencyList']);
         Route::get('show/{id}', [$controller, 'componentShow']);
         Route::get('tags/{id}', [$controller, 'componentTags']);
         Route::get('data/{id}', [$controller, 'componentData']);
