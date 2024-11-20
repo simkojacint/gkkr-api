@@ -57,5 +57,35 @@ class ComponentController extends BasicApiController
         return $response->json();
     }
 
+    public function checkDependencies(Request $request, $id)
+    {
+        $response = $this->componentDependencyList(new \Illuminate\Http\Request(), $id)['data'];
 
+        $providers = base_path('config/gkkr_providers.php');
+
+        if (file_exists($providers)) {
+            $content = include $providers;
+        }
+
+        $dependencies = [];
+        if (!empty($response)) {
+            foreach ($response as $key => $value) {
+                $searchTerm = $value['name'] . 'ServiceProvider';
+
+                $exists = array_filter($content, function ($item) use ($searchTerm) {
+                    return strpos($item, $searchTerm) !== false;
+                });
+
+                if (empty($exists)) {
+                    $dependencies[] = $value;
+                }
+            }
+
+            if (!empty($dependencies)) {
+                return $dependencies;
+            }
+        }
+
+        return true;
+    }
 }
