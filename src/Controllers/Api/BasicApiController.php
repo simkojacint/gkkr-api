@@ -142,7 +142,7 @@ class BasicApiController extends Controller
                     });
                     if (count($seeders) > 0)  {
                         foreach($seeders as $seeder) {
-                            $migrations[] = shell_exec('php /var/www/html/artisan db:seed --class="'.substr($seeder, 0, -4).'"');
+                            shell_exec('php /var/www/html/artisan db:seed --class="'.substr($seeder, 0, -4).'"');
                         }
                     }
                 }
