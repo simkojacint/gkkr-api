@@ -69,6 +69,8 @@ class BasicApiController extends Controller
 
         $namespacePivot = [];
 
+        shell_exec('git config --global --add safe.directory /var/www/html');
+
         list($composerJsonChanged, $namespace, $composerJson, $namespacePivot) = $this->collectComposerJsonChanges($packageComposerJson, $composerJson, $finalPackagePath, $namespacePivot);
 
         if ($composerJsonChanged) {
@@ -167,9 +169,17 @@ class BasicApiController extends Controller
     protected function defaultUninstall(string $apiName, $id, $version = null)
     {
         $uninstallOutput = [];
-        $filePath = 'gkkr/' . $id . (!is_null($version) ? ('_' . $version) : '') . '.log';
-        if(Storage::has($filePath)) {
-            $content = Storage::get($filePath);
+        $dir = glob(storage_path('app/gkkr').'/'.$id.'_*.log');
+
+        $filePath = false;
+
+        if(!empty($dir)) {
+            $dir = array_reverse($dir);
+            $filePath = reset($dir);
+        }
+
+        if($filePath && File::exists($filePath)) {
+            $content = File::get($filePath);
             $data = json_decode($content, true);
 
             if($data['type'] !== $apiName) {
@@ -219,8 +229,8 @@ class BasicApiController extends Controller
             }
         }
 
-        if(Storage::has($filePath)) {
-            Storage::delete($filePath);
+        if(File::exists($filePath)) {
+            File::delete($filePath);
         }
 
         return $uninstallOutput;
