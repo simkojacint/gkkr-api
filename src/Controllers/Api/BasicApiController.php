@@ -33,17 +33,17 @@ class BasicApiController extends Controller
      */
     protected function defaultInstall(string $apiName, string $dataName, string $configName, $id, $version = null): JsonResponse
     {
-        $response = $this->webApi->get($this->getUrl($apiName.'/install/' . $id . '/' . $version));
+        $response = $this->webApi->get($this->getUrl($apiName . '/install/' . $id . '/' . $version));
         $data = $response->json();
-        if(is_null($version)) {
+        if (is_null($version)) {
             $version = $data['version'];
         }
 
-        if(is_string($data)) {
+        if (is_string($data)) {
             return response()->json($data, 403);
         }
 
-        $packagePath = base_path('packages/'.$apiName.'/raw/' . $data[$dataName] . '/');
+        $packagePath = base_path('packages/' . $apiName . '/raw/' . $data[$dataName] . '/');
         File::makeDirectory($packagePath, 0775, true, true);
 
         $filePath = $packagePath . $data['fileName'];
@@ -51,10 +51,10 @@ class BasicApiController extends Controller
 
         $this->extractTarBall($filePath, $packagePath);
 
-        $dirs = array_filter(glob($packagePath.'*'), 'is_dir');
+        $dirs = array_filter(glob($packagePath . '*'), 'is_dir');
         $packageExtractedPath = $dirs[0];
         $finalPackagePath = dirname(dirname(dirname($dirs[0]))) . '/' . $data[$dataName];
-        $gkkrProviders = base_path('config/gkkr_'.$configName.'.php');
+        $gkkrProviders = base_path('config/gkkr_' . $configName . '.php');
 
         if (File::isDirectory($finalPackagePath)) {
             File::deleteDirectory($finalPackagePath);
@@ -101,50 +101,50 @@ class BasicApiController extends Controller
                 foreach ($publishableProviders as $provider) {
                     $published = shell_exec('php /var/www/html/artisan vendor:publish --provider="' . $provider . '"');
                     [$pub, $git, $dirs] = $this->processPublished($published);
-                    if(! empty($git)) {
+                    if (!empty($git)) {
                         $currentGitUser = shell_exec('cd /var/www/html && git config user.name');
                         $currentGitEmail = shell_exec('cd /var/www/html && git config user.email');
                         $commitCommand = 'cd /var/www/html/ && git config user.name "System" && git config user.email "nobody@dev.futureweb.hu" && git commit -m "Installed ' . $provider . '"';
                         $execOutput = shell_exec($commitCommand);
                         Log::debug('git commit changes: ' . $execOutput . '|Command: ' . $commitCommand);
-                        shell_exec('cd /var/www/html/ && git config user.name "'.$currentGitUser.'" && git config user.email "'.$currentGitEmail.'"');
+                        shell_exec('cd /var/www/html/ && git config user.name "' . $currentGitUser . '" && git config user.email "' . $currentGitEmail . '"');
 
                         $gitCommitHash = trim(shell_exec('git log -1 --pretty="%h"'));
                         $changes = shell_exec('cd /var/www/html && git show --name-only "' . $gitCommitHash . '"');
                         $changedFiles = explode("\n", $changes);
 
-                        foreach($changedFiles as $file) {
-                            if(!empty($file) && !in_array($file, $filesException) && file_exists(base_path($file))) {
+                        foreach ($changedFiles as $file) {
+                            if (!empty($file) && !in_array($file, $filesException) && file_exists(base_path($file))) {
                                 $files[] = $file;
                             }
                         }
                     }
-                    $publishOutput[] =  $published;
+                    $publishOutput[] = $published;
 
 
                 }
 
                 $migrationsDir = $finalPackagePath . '/src/database/migrations/';
-                if(is_dir($migrationsDir)) {
-                    $_migrations = array_filter(scandir($migrationsDir), function($item){
+                if (is_dir($migrationsDir)) {
+                    $_migrations = array_filter(scandir($migrationsDir), function ($item) {
                         return $item !== '.' && $item !== '..' ? $item : false;
                     });
-                    if (count($_migrations) > 0)  {
+                    if (count($_migrations) > 0) {
                         shell_exec('php /var/www/html/artisan migrate');
-                        foreach($_migrations as $migration) {
+                        foreach ($_migrations as $migration) {
                             $migrations[] = 'database/migrations/' . $migration;
                         }
                     }
 
                 }
                 $seedersDir = $finalPackagePath . '/src/database/seeders/';
-                if(is_dir($seedersDir)) {
-                    $seeders = array_filter(scandir($seedersDir), function($item){
+                if (is_dir($seedersDir)) {
+                    $seeders = array_filter(scandir($seedersDir), function ($item) {
                         return $item != '.' && $item != '..' ? $item : false;
                     });
-                    if (count($seeders) > 0)  {
-                        foreach($seeders as $seeder) {
-                            shell_exec('php /var/www/html/artisan db:seed --class="'.substr($seeder, 0, -4).'"');
+                    if (count($seeders) > 0) {
+                        foreach ($seeders as $seeder) {
+                            shell_exec('php /var/www/html/artisan db:seed --class="' . substr($seeder, 0, -4) . '"');
                         }
                     }
                 }
@@ -160,8 +160,52 @@ class BasicApiController extends Controller
             'providers' => $publishableProviders,
             'config_file' => $gkkrProviders,
         ];
-        $filePath = 'gkkr/' . $id . (!is_null($version) ? ('_' . $version) : '') . '.log';
+        if ($apiName == 'repository') {
+            $installedProviders = storage_path('installed_providers.php');
+
+            if (!File::exists($installedProviders)) {
+                File::put($installedProviders, "<?php return \r\n" . var_export([], true) . ";");
+            }
+
+            $dataInstalled = include $installedProviders;
+        }
+
+        $filePath = 'gkkr/' . $apiName . '_' . $id . (!is_null($version) ? ('_' . $version) : '') . '.log';
+
         Storage::put($filePath, json_encode($installedData, JSON_PRETTY_PRINT));
+
+        $composer = json_decode(File::get(base_path('composer.json')), true);
+
+        $configFile = include $gkkrProviders;
+        foreach ($publishableProviders as $provider) {
+            if (in_array($provider, $configFile)) {
+                if (($key = array_search($provider, $configFile)) !== false) {
+                    unset($configFile[$key]);
+                }
+            }
+
+            if ($apiName == 'repository') {
+                if (!in_array($provider, $dataInstalled)) {
+                    $dataInstalled[] = $provider;
+                }
+            }
+
+            $temp = explode('\\', $provider);
+            $providerPackage = $temp[0] . '\\' . $temp[1] . '\\';
+
+            if (isset($composer['autoload']['psr-4'][$providerPackage])) {
+                unset($composer['autoload']['psr-4'][$providerPackage]);
+            }
+
+
+        }
+        File::put(base_path('composer.json'), json_encode($composer, JSON_PRETTY_PRINT));
+
+        File::put($gkkrProviders, "<?php return \r\n" . var_export($configFile, true) . ";");
+
+        if ($apiName == 'repository') {
+            File::put($installedProviders, "<?php return \r\n" . var_export($dataInstalled, true) . ";");
+        }
 
         return response()->json($installedData);
     }
@@ -169,67 +213,58 @@ class BasicApiController extends Controller
     protected function defaultUninstall(string $apiName, $id, $version = null)
     {
         $uninstallOutput = [];
-        $dir = glob(storage_path('app/gkkr').'/'.$id.'_*.log');
+        $dir = glob(storage_path('app/gkkr') . '/' . $apiName . '_' . $id . '_*.log');
 
         $filePath = false;
 
-        if(!empty($dir)) {
+        if (!empty($dir)) {
             $dir = array_reverse($dir);
             $filePath = reset($dir);
         }
 
-        if($filePath && File::exists($filePath)) {
+        if ($filePath && File::exists($filePath)) {
             $content = File::get($filePath);
             $data = json_decode($content, true);
 
-            if($data['type'] !== $apiName) {
+            if ($data['type'] !== $apiName) {
                 return response()->json('Package type missmatch!', 422);
             }
 
-            if(isset($data['migrations'])) {
-                foreach($data['migrations'] as $migration) {
+            if (isset($data['migrations'])) {
+                foreach ($data['migrations'] as $migration) {
                     $uninstallOutput[] = 'Rolling back migration: ' . $migration;
                     $uninstallOutput[] = shell_exec('php /var/www/html/artisan migrate:rollback --path=' . $migration);
                 }
             }
 
 
-            foreach($data['files'] as $file) {
+            foreach ($data['files'] as $file) {
                 $abs = base_path($file);
-                if(file_exists($abs) && ! str_contains($abs, 'app/Http/Controllers/Api')) {
+                if (file_exists($abs) && !str_contains($abs, 'app/Http/Controllers/Api')) {
                     $uninstallOutput[] = File::delete($abs);
                 }
             }
+        }
 
-            if(isset($data['providers'])) {
-                ob_start();
-                $configFile = include $data['config_file'];
-                ob_get_clean();
+        $installedProviders = storage_path('installed_providers.php');
 
-                $composer = json_decode(File::get(base_path('composer.json')), true);
+        if (File::exists($installedProviders)) {
+            $dataInstalled = include $installedProviders;
 
+            if (count($data['providers'])) {
                 foreach ($data['providers'] as $provider) {
-                    if (in_array($provider, $configFile)) {
-                        if (($key = array_search($provider, $configFile)) !== false) {
-                            unset($configFile[$key]);
-                        }
+                    if(in_array($provider, $dataInstalled)) {
+                        $index = array_search($provider, $dataInstalled);
+                        unset($dataInstalled[$index]);
                     }
-
-                    $temp = explode('\\', $provider);
-                    $providerPackage = $temp[0] . '\\' . $temp[1] . '\\';
-
-                    if (isset($composer['autoload']['psr-4'][$providerPackage])) {
-                        unset($composer['autoload']['psr-4'][$providerPackage]);
-                    }
-
-                    File::put(base_path('composer.json'), json_encode($composer, JSON_PRETTY_PRINT));
                 }
 
-                File::put($data['config_file'], "<?php return \r\n" . var_export($configFile, true) . ";");
+                File::put($installedProviders, "<?php return \r\n" . var_export($dataInstalled, true) . ";");
             }
         }
 
-        if(File::exists($filePath)) {
+
+        if (File::exists($filePath)) {
             File::delete($filePath);
         }
 

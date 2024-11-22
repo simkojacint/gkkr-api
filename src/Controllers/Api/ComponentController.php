@@ -61,13 +61,14 @@ class ComponentController extends BasicApiController
     {
         $response = $this->componentDependencyList(new \Illuminate\Http\Request(), $id)['data'];
 
-        $providers = base_path('config/gkkr_providers.php');
+        $providers = storage_path('installed_providers.php');
 
         if (file_exists($providers)) {
             $content = include $providers;
         }
 
         $dependencies = [];
+
         if (!empty($response)) {
             foreach ($response as $key => $value) {
                 $searchTerm = $value['name'] . 'ServiceProvider';
