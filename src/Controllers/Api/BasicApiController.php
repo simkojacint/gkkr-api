@@ -130,7 +130,7 @@ class BasicApiController extends Controller
                         return $item !== '.' && $item !== '..' ? $item : false;
                     });
                     if (count($_migrations) > 0)  {
-                        shell_exec('php /var/www/html/artisan migrate --path=' . $finalPackagePath . '/src/database/migrations/');
+                        shell_exec('php /var/www/html/artisan migrate');
                         foreach($_migrations as $migration) {
                             $migrations[] = 'database/migrations/' . $migration;
                         }
