@@ -292,7 +292,7 @@ class BasicApiController extends Controller
         }
 
         $commitMessage = 'Automated commit: Removed files during uninstallation';
-        $gitCommitCommand = 'cd /var/www/html/ && git commit -m ' . escapeshellarg($commitMessage);
+        $gitCommitCommand = 'cd /var/www/html/ && git config user.name "System" && git config user.email "nobody@dev.futureweb.hu" && git commit -m ' . escapeshellarg($commitMessage);
 
         $gitCommitOutput = shell_exec($gitCommitCommand);
 
