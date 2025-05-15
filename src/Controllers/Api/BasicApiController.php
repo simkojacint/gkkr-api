@@ -276,7 +276,7 @@ class BasicApiController extends Controller
                         : 'Failed to delete file: ' . $abs;
 
                     $dirs[] = dirname($abs);
-                    $gitCommands[] = 'cd /var/www/html/ && git rm ' . $file;
+                    $gitCommands[] = 'cd /var/www/html/ && git add ' . $file;
                 }
             }
 
