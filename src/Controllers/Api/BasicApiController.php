@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Exception;
 
 class BasicApiController extends Controller
 {
@@ -91,6 +92,7 @@ class BasicApiController extends Controller
         $publishOutput = [];
         $migrations = [];
         $files = [];
+        $seedersInstalled = [];
         $filesException = ['composer.json', 'config/gkkr_providers.php', 'config/gkkr_components.php'];
 
         if ($configAppChanged) {
@@ -145,6 +147,7 @@ class BasicApiController extends Controller
                     if (count($seeders) > 0) {
                         foreach ($seeders as $seeder) {
                             shell_exec('php /var/www/html/artisan db:seed --class="' . substr($seeder, 0, -4) . '"');
+                            $seedersInstalled[] = 'database/seeders/' . $seeder;
                         }
                     }
                 }
@@ -159,6 +162,7 @@ class BasicApiController extends Controller
             'files' => $files,
             'providers' => $publishableProviders,
             'config_file' => $gkkrProviders,
+            'seeders' => $seedersInstalled,
         ];
         if ($apiName == 'repository') {
             $installedProviders = storage_path('installed_providers.php');
@@ -237,14 +241,67 @@ class BasicApiController extends Controller
                 }
             }
 
+            if (isset($data['seeders'])) {
+                foreach ($data['seeders'] as $seeder) {
+                    $uninstallOutput[] = 'Remove seeder data: ' . $seeder;
+
+                    $seederClass = $this->getNamespaceAndClassFromFile(base_path($seeder));
+
+                    if (!is_null($seederClass['fqcn'])) {
+                        $seederInstance = new $seederClass['fqcn']();
+
+                        if (method_exists($seederInstance, 'remove')) {
+                            $seederInstance->remove();
+                            $uninstallOutput[] = 'Data removed for seeder: ' . $seeder;
+                        } else {
+                            $uninstallOutput[] = 'No remove() method found for seeder: ' . $seeder;
+                        }
+
+                    }
+                }
+            }
+
+
+            Log::debug('Starting file deletions...');
+            $gitCommands = [];
+            $dirs = [];
 
             foreach ($data['files'] as $file) {
                 $abs = base_path($file);
-                if (file_exists($abs) && !str_contains($abs, 'app/Http/Controllers/Api')) {
-                    $uninstallOutput[] = File::delete($abs);
+
+                if (File::exists($abs) && !str_contains($abs, 'app/Http/Controllers/Api')) {
+                    $deleteResult = File::delete($abs);
+                    $uninstallOutput[] = $deleteResult
+                        ? 'File deleted: ' . $abs
+                        : 'Failed to delete file: ' . $abs;
+
+                    $dirs[] = dirname($abs);
+                    $gitCommands[] = 'cd /var/www/html/ && git rm ' . $file;
                 }
             }
+
+            $gitOutput = [];
+            foreach ($gitCommands as $gitCommand) {
+                $gitOutput[] = ['input' => $gitCommand, 'output' => shell_exec($gitCommand)];
+            }
+
+
+            Log::debug('Git commands executed:', $gitOutput);
+            Log::debug('Directories affected:', $dirs);
+
         }
+
+        $commitMessage = 'Automated commit: Removed files during uninstallation';
+        $gitCommitCommand = 'cd /var/www/html/ && git commit -m ' . escapeshellarg($commitMessage);
+
+        $gitCommitOutput = shell_exec($gitCommitCommand);
+
+        if ($gitCommitOutput === null) {
+            $uninstallOutput[] = 'Git commit failed. Check your repository status.';
+        } else {
+            $uninstallOutput[] = 'Git commit successful: ' . $commitMessage;
+        }
+
 
         $installedProviders = storage_path('installed_providers.php');
 
@@ -253,7 +310,7 @@ class BasicApiController extends Controller
 
             if (count($data['providers'])) {
                 foreach ($data['providers'] as $provider) {
-                    if(in_array($provider, $dataInstalled)) {
+                    if (in_array($provider, $dataInstalled)) {
                         $index = array_search($provider, $dataInstalled);
                         unset($dataInstalled[$index]);
                     }
@@ -268,7 +325,41 @@ class BasicApiController extends Controller
             File::delete($filePath);
         }
 
+        Log::debug('Uninstall output: ' . implode("\n", $uninstallOutput));
         return $uninstallOutput;
+    }
+
+    public function getNamespaceAndClassFromFile($filePath)
+    {
+        if (!file_exists($filePath)) {
+            throw new Exception("File does not exist: $filePath");
+        }
+
+        $content = file_get_contents($filePath);
+
+        $namespace = null;
+        $class = null;
+
+        // Match namespace
+        if (preg_match('/^namespace\s+(.+?);/m', $content, $matches)) {
+            $namespace = $matches[1];
+        }
+
+        // Match class (you could expand this to include interface, trait, enum)
+        if (preg_match('/^class\s+(\w+)/m', $content, $matches)) {
+            $class = $matches[1];
+        }
+
+        // Optional: Match interface, trait, or enum
+        if (!$class && preg_match('/^(interface|trait|enum)\s+(\w+)/m', $content, $matches)) {
+            $class = $matches[2];
+        }
+
+        return [
+            'namespace' => $namespace,
+            'class' => $class,
+            'fqcn' => $namespace && $class ? $namespace . '\\' . $class : $class
+        ];
     }
 
     protected function processPublished(string $published)
